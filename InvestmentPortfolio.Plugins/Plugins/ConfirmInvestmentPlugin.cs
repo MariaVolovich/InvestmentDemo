@@ -1,6 +1,5 @@
 ﻿using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
-using InvestmentPortfolio.Plugins.Services;
 using InvestmentPortfolio.Plugins.Common;
 using InvestmentPortfolio.Plugins.Common.Constants;
 
