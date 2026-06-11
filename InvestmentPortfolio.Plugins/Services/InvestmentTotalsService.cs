@@ -1,147 +1,126 @@
 ﻿using InvestmentPortfolio.Plugins.Common.Constants;
-using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Query;
+using Microsoft.Xrm.Sdk;
+using System;
 
-namespace InvestmentPortfolio.Plugins.Services
+public class InvestmentTotalsService
 {
-    public class InvestmentTotalsService
+    private readonly IOrganizationService _service;
+    private readonly ITracingService _tracing;
+
+    public InvestmentTotalsService(
+        IOrganizationService service,
+        ITracingService tracing)
     {
+        _service = service;
+        _tracing = tracing;
+    }
 
-        private readonly IOrganizationService _service;
-        private readonly ITracingService _tracing;
+    private decimal GetConfirmedInvestmentsTotal(
+        string lookupField,
+        Guid relatedId)
+    {
+        var fetch = $@"
+        <fetch aggregate='true'>
+            <entity name='mv_investment'>
+                <attribute name='mv_amount'
+                           alias='total'
+                           aggregate='sum' />
 
-        public InvestmentTotalsService(
-            IOrganizationService service,
-            ITracingService tracing)
+                <filter>
+                    <condition attribute='{lookupField}'
+                               operator='eq'
+                               value='{relatedId}' />
+
+                    <condition attribute='mv_lifecycle'
+                               operator='eq'
+                               value='{InvestmentStatus.Confirmed}' />
+                </filter>
+            </entity>
+        </fetch>";
+
+        var result =
+            _service.RetrieveMultiple(
+                new FetchExpression(fetch));
+
+        if (result.Entities.Count == 0 ||
+            !result.Entities[0].Contains("total"))
         {
-            _service = service;
-            _tracing = tracing;
+            return 0;
         }
 
-        public void UpdateOpportunityTotalRaised(
-            Entity investment)
+        var aliasedValue =
+            (AliasedValue)result.Entities[0]["total"];
+
+        return aliasedValue.Value is Money money
+            ? money.Value
+            : 0;
+    }
+
+    public void UpdateInvestorTotalInvested(
+    Entity investment)
+    {       
+
+        var investorRef =
+            investment.GetAttributeValue<EntityReference>(
+                "mv_investor");
+
+        if (investorRef == null)
+            return;
+
+        _tracing.Trace(
+            $"Updating Investor totals for {investorRef.Id}");
+
+        var total =
+            GetConfirmedInvestmentsTotal(
+                "mv_investor",
+                investorRef.Id);
+
+        var update = new Entity("mv_investor")
         {
-            if (!investment.Contains("mv_investmentopportunity"))
-                return;
+            Id = investorRef.Id
+        };
 
-            var opportunityRef =
-                investment.GetAttributeValue<EntityReference>(
-                    "mv_investmentopportunity"
-                );
+        update["mv_totalinvested"] =
+            new Money(total);
 
-            _tracing.Trace(
-                $"Updating Opportunity totals for {opportunityRef.Id}");
+        _service.Update(update);
 
-            var fetch = $@"
-            <fetch aggregate='true'>
-                <entity name='mv_investment'>
-                    <attribute name='mv_amount'
-                               alias='total'
-                               aggregate='sum' />
+        _tracing.Trace(
+            $"Investor total updated to {total}");
+    }
 
-                    <filter>
-                        <condition attribute='mv_investmentopportunity'
-                                   operator='eq'
-                                   value='{opportunityRef.Id}' />
+    public void UpdateOpportunityTotalRaised(
+    Entity investment)
+    {        
 
-                        <condition attribute='mv_lifecycle'
-                                   operator='eq'
-                                   value='{InvestmentStatus.Confirmed}' />
-                    </filter>
-                </entity>
-            </fetch>";
+        var opportunityRef =
+            investment.GetAttributeValue<EntityReference>(
+                "mv_investmentopportunity");
 
-            var result =
-                _service.RetrieveMultiple(
-                    new FetchExpression(fetch));
+        if (opportunityRef == null)
+            return;
 
-            decimal total = 0;
+        _tracing.Trace(
+            $"Updating Opportunity totals for {opportunityRef.Id}");
 
-            if (result.Entities.Count > 0 &&
-                result.Entities[0].Contains("total"))
-            {
-                var aliasedValue =
-                    (AliasedValue)result.Entities[0]["total"];
+        var total =
+            GetConfirmedInvestmentsTotal(
+                "mv_investmentopportunity",
+                opportunityRef.Id);
 
-                if (aliasedValue.Value != null)
-                    total = ((Money)aliasedValue.Value).Value;
-            }
-
-            var update = new Entity("mv_investmentopportunity")
+        var update =
+            new Entity("mv_investmentopportunity")
             {
                 Id = opportunityRef.Id
             };
 
-            update["mv_totalconfirmedraised"] =
-                new Money(total);
+        update["mv_totalconfirmedraised"] =
+            new Money(total);
 
-            _service.Update(update);
+        _service.Update(update);
 
-            _tracing.Trace(
-                $"Opportunity total updated to {total}");
-        }
-
-        public void UpdateInvestorTotalInvested(
-            Entity investment)
-        {
-            if (!investment.Contains("mv_investor"))
-                return;
-
-            var investorRef =
-                investment.GetAttributeValue<EntityReference>(
-                    "mv_investor"
-                );
-
-            _tracing.Trace(
-                $"Updating Investor totals for {investorRef.Id}");
-
-            var fetch = $@"
-            <fetch aggregate='true'>
-                <entity name='mv_investment'>
-                    <attribute name='mv_amount'
-                               alias='total'
-                               aggregate='sum' />
-
-                    <filter>
-                        <condition attribute='mv_investor'
-                                   operator='eq'
-                                   value='{investorRef.Id}' />
-
-                        <condition attribute='mv_lifecycle'
-                                   operator='eq'
-                                   value='{InvestmentStatus.Confirmed}' />
-                    </filter>
-                </entity>
-            </fetch>";
-
-            var result =
-                _service.RetrieveMultiple(
-                    new FetchExpression(fetch));
-
-            decimal total = 0;
-
-            if (result.Entities.Count > 0 &&
-                result.Entities[0].Contains("total"))
-            {
-                var aliasedValue =
-                    (AliasedValue)result.Entities[0]["total"];
-
-                if (aliasedValue.Value != null)
-                    total = ((Money)aliasedValue.Value).Value;
-            }
-
-            var update = new Entity("mv_investor")
-            {
-                Id = investorRef.Id
-            };
-
-            update["mv_totalinvested"] =
-                new Money(total);
-
-            _service.Update(update);
-
-            _tracing.Trace(
-                $"Investor total updated to {total}");
-        }
+        _tracing.Trace(
+            $"Opportunity total updated to {total}");
     }
 }
