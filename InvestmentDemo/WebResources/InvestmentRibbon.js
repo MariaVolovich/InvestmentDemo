@@ -1,5 +1,4 @@
 ﻿var InvestmentRibbon = (function () {
-    debugger;
 
     function confirmInvestment(primaryControl) {
 
