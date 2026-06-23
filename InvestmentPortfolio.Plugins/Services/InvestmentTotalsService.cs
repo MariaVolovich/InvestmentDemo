@@ -1,126 +1,144 @@
 ﻿using InvestmentPortfolio.Plugins.Common.Constants;
-using Microsoft.Xrm.Sdk.Query;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Sdk.Query;
 using System;
 
-public class InvestmentTotalsService
+namespace InvestmentPortfolio.Plugins.Services
 {
-    private readonly IOrganizationService _service;
-    private readonly ITracingService _tracing;
-
-    public InvestmentTotalsService(
-        IOrganizationService service,
-        ITracingService tracing)
+    public class InvestmentTotalsService
     {
-        _service = service;
-        _tracing = tracing;
-    }
+        private readonly IOrganizationService _service;
+        private readonly ITracingService _tracing;
 
-    private decimal GetConfirmedInvestmentsTotal(
-        string lookupField,
-        Guid relatedId)
-    {
-        var fetch = $@"
-        <fetch aggregate='true'>
-            <entity name='mv_investment'>
-                <attribute name='mv_amount'
-                           alias='total'
-                           aggregate='sum' />
-
-                <filter>
-                    <condition attribute='{lookupField}'
-                               operator='eq'
-                               value='{relatedId}' />
-
-                    <condition attribute='mv_lifecycle'
-                               operator='eq'
-                               value='{InvestmentStatus.Confirmed}' />
-                </filter>
-            </entity>
-        </fetch>";
-
-        var result =
-            _service.RetrieveMultiple(
-                new FetchExpression(fetch));
-
-        if (result.Entities.Count == 0 ||
-            !result.Entities[0].Contains("total"))
+        public InvestmentTotalsService(
+            IOrganizationService service,
+            ITracingService tracing)
         {
-            return 0;
+            _service = service;
+            _tracing = tracing;
         }
 
-        var aliasedValue =
-            (AliasedValue)result.Entities[0]["total"];
-
-        return aliasedValue.Value is Money money
-            ? money.Value
-            : 0;
-    }
-
-    public void UpdateInvestorTotalInvested(
-    Entity investment)
-    {       
-
-        var investorRef =
-            investment.GetAttributeValue<EntityReference>(
-                "mv_investor");
-
-        if (investorRef == null)
-            return;
-
-        _tracing.Trace(
-            $"Updating Investor totals for {investorRef.Id}");
-
-        var total =
-            GetConfirmedInvestmentsTotal(
-                "mv_investor",
-                investorRef.Id);
-
-        var update = new Entity("mv_investor")
+        public void UpdateInvestorTotalInvested(
+            Entity investment)
         {
-            Id = investorRef.Id
-        };
+            UpdateConfirmedInvestmentTotal(
+                investment,
+                sourceLookupField: "mv_investor",
+                targetEntityName: "mv_investor",
+                targetTotalField: "mv_totalinvested",
+                traceLabel: "Investor");
+        }
 
-        update["mv_totalinvested"] =
-            new Money(total);
+        public void UpdateOpportunityTotalRaised(
+            Entity investment)
+        {
+            UpdateConfirmedInvestmentTotal(
+                investment,
+                sourceLookupField: "mv_investmentopportunity",
+                targetEntityName: "mv_investmentopportunity",
+                targetTotalField: "mv_totalconfirmedraised",
+                traceLabel: "Opportunity");
+        }
 
-        _service.Update(update);
+        private void UpdateConfirmedInvestmentTotal(
+            Entity investment,
+            string sourceLookupField,
+            string targetEntityName,
+            string targetTotalField,
+            string traceLabel)
+        {
+            var parentRef =
+                investment.GetAttributeValue<EntityReference>(
+                    sourceLookupField);
 
-        _tracing.Trace(
-            $"Investor total updated to {total}");
-    }
+            if (parentRef == null)
+                return;
 
-    public void UpdateOpportunityTotalRaised(
-    Entity investment)
-    {        
+            _tracing.Trace(
+                $"Updating {traceLabel} totals for {parentRef.Id}");
 
-        var opportunityRef =
-            investment.GetAttributeValue<EntityReference>(
-                "mv_investmentopportunity");
+            var total =
+                GetConfirmedInvestmentsTotal(
+                    sourceLookupField,
+                    parentRef.Id);
 
-        if (opportunityRef == null)
-            return;
+            UpdateMoneyField(
+                targetEntityName,
+                parentRef.Id,
+                targetTotalField,
+                total);
 
-        _tracing.Trace(
-            $"Updating Opportunity totals for {opportunityRef.Id}");
+            _tracing.Trace(
+                $"{traceLabel} total updated to {total}");
+        }
 
-        var total =
-            GetConfirmedInvestmentsTotal(
-                "mv_investmentopportunity",
-                opportunityRef.Id);
+        private decimal GetConfirmedInvestmentsTotal(
+            string lookupField,
+            Guid relatedId)
+        {
+            var fetch = $@"
+            <fetch aggregate='true'>
+                <entity name='mv_investment'>
+                    <attribute name='mv_amount'
+                               alias='total'
+                               aggregate='sum' />
 
-        var update =
-            new Entity("mv_investmentopportunity")
+                    <filter>
+                        <condition attribute='{lookupField}'
+                                   operator='eq'
+                                   value='{relatedId}' />
+
+                        <condition attribute='mv_lifecycle'
+                                   operator='eq'
+                                   value='{InvestmentStatus.Confirmed}' />
+                    </filter>
+                </entity>
+            </fetch>";
+
+            var result =
+                _service.RetrieveMultiple(
+                    new FetchExpression(fetch));
+
+            return ExtractMoneyAggregate(
+                result,
+                "total");
+        }
+
+        private static decimal ExtractMoneyAggregate(
+            EntityCollection result,
+            string alias)
+        {
+            if (result.Entities.Count == 0 ||
+                !result.Entities[0].Contains(alias))
             {
-                Id = opportunityRef.Id
-            };
+                return 0;
+            }
 
-        update["mv_totalconfirmedraised"] =
-            new Money(total);
+            var aliasedValue =
+                result.Entities[0].GetAttributeValue<AliasedValue>(
+                    alias);
 
-        _service.Update(update);
+            return aliasedValue?.Value is Money money
+                ? money.Value
+                : 0;
+        }
 
-        _tracing.Trace(
-            $"Opportunity total updated to {total}");
+        private void UpdateMoneyField(
+            string entityName,
+            Guid recordId,
+            string moneyField,
+            decimal value)
+        {
+            var update =
+                new Entity(entityName)
+                {
+                    Id = recordId
+                };
+
+            update[moneyField] =
+                new Money(value);
+
+            _service.Update(update);
+        }
     }
 }

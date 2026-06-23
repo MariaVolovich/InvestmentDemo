@@ -2,6 +2,7 @@
 using Microsoft.Xrm.Sdk.Query;
 using InvestmentPortfolio.Plugins.Common;
 using InvestmentPortfolio.Plugins.Common.Constants;
+using InvestmentPortfolio.Plugins.Services;
 
 namespace InvestmentPortfolio.Plugins.Plugins.Investment
 {

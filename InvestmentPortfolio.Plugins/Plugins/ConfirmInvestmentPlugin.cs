@@ -2,6 +2,7 @@
 using Microsoft.Xrm.Sdk.Query;
 using InvestmentPortfolio.Plugins.Common;
 using InvestmentPortfolio.Plugins.Common.Constants;
+using InvestmentPortfolio.Plugins.Services;
 
 namespace InvestmentPortfolio.Plugins.Plugins.Investment
 {
@@ -121,6 +122,7 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
                 throw new InvalidPluginExecutionException(
                     "Investment date is required before confirmation."
                 );
-        }      
+        }
+        
     }
 }
