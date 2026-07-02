@@ -50,18 +50,13 @@ CRM.Utils = (function () {
         }
     }
 
-    function log(message, data) {
-        console.log("[CRM]", message, data || "");
-    }
-
     function retrieveMultiple(entityName, query) {
 
         return Xrm.WebApi.retrieveMultipleRecords(entityName, query)
             .then(function (result) {
                 return result.entities;
             })
-            .catch(function (error) {
-                console.error("[CRM][retrieveMultiple]", error.message);
+            .catch(function () {
                 return [];
             });
     }
@@ -71,19 +66,15 @@ CRM.Utils = (function () {
         if (!id)
             return Promise.resolve(null);
 
-        // handle lookup array input automatically
         if (Array.isArray(id)) {
             id = id[0]?.id;
         }
 
-        // handle lookup object input
         if (typeof id === "object" && id.id) {
             id = id.id;
         }
 
-        // now ensure it's string
         if (typeof id !== "string") {
-            console.warn("[CRM][retrieveById] Invalid ID format:", id);
             return Promise.resolve(null);
         }
 
@@ -94,8 +85,7 @@ CRM.Utils = (function () {
             : "";
 
         return Xrm.WebApi.retrieveRecord(entityName, cleanId, query)
-            .catch(function (error) {
-                console.error("[CRM][retrieveById]", error.message);
+            .catch(function () {
                 return null;
             });
     }
@@ -110,7 +100,6 @@ CRM.Utils = (function () {
         clearNotification: clearNotification,
         setVisible: setVisible,
         setDisabled: setDisabled,
-        log: log,
         retrieveMultiple: retrieveMultiple,
         retrieveById: retrieveById
     };

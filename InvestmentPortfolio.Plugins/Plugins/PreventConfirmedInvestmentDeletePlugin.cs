@@ -52,10 +52,11 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             tracing.Trace($"Lifecycle: {lifecycle}");
 
+            // Confirmed investments are protected to preserve investment history.
             if (lifecycle == InvestmentStatus.Confirmed)
             {
                 throw new InvalidPluginExecutionException(
-                    "Confirmed investments cannot be deleted."
+                    "Confirmed investments cannot be deleted because they are part of the investment history."
                 );
             }
 

@@ -55,6 +55,8 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
                 return;
             }
 
+            // Confirmed investments are locked to preserve approved business data.
+            // Users must return the record to Draft before changing core investment details.
             foreach (var field in ProtectedFields)
             {
                 if (target.Contains(field))

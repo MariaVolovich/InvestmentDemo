@@ -82,6 +82,7 @@ CRM.Investor = (function () {
         }
     }
 
+    // Risk level is derived from the Investor's total confirmed investment amount.
     function updateRiskLevel(executionContext) {
 
         var formContext =
@@ -95,7 +96,7 @@ CRM.Investor = (function () {
                 "mv_totalinvested"
             )?.getValue();
 
-        if (total == null)
+        if (total === null || total === undefined)
             return;
 
         var riskLevel = null;
