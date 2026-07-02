@@ -76,6 +76,7 @@ namespace InvestmentPortfolio.Plugins.Services
             string lookupField,
             Guid relatedId)
         {
+            // Totals are calculated from confirmed investments only, so Draft records are excluded.
             var fetch = $@"
             <fetch aggregate='true'>
                 <entity name='mv_investment'>

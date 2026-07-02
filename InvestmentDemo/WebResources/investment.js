@@ -177,9 +177,9 @@ CRM.Investment = (function () {
             CRM.Utils.showNotification(
                 formContext,
                 "Exit Date cannot be earlier than Investment Date.",
-                    "ERROR",
-                    Notifications.ExitDateValidation
-                );
+                "ERROR",
+                Notifications.ExitDateValidation
+            );
 
             attrs.exitDate.setValue(null);
 
@@ -205,12 +205,12 @@ CRM.Investment = (function () {
 
         if (!attrs.date) return;
 
-        // Do not overwrite existing value
         if (attrs.date.getValue()) return;
 
         attrs.date.setValue(new Date());
     }
 
+    // Display portfolio summary from server-side confirmed totals.
     function setInvestorPortfolioSummary(executionContext) {
 
         var formContext = executionContext.getFormContext();
@@ -235,8 +235,7 @@ CRM.Investment = (function () {
             ["mv_totalinvested", "mv_fullname"]
         ).then(function (record) {
 
-            if (!record || record.mv_totalinvested == null) {
-
+            if (!record || record.mv_totalinvested === null || record.mv_totalinvested === undefined) {
                 CRM.Utils.setValue(
                     formContext,
                     Schema.Fields.PortfolioSummary,
@@ -263,6 +262,7 @@ CRM.Investment = (function () {
         });
     }
 
+    // Confirmed investments are locked on the form; server-side plugins enforce the same rule.
     function lockFieldsIfConfirmed(executionContext) {
         var formContext = executionContext.getFormContext();
         var attrs = getAttributes(formContext);

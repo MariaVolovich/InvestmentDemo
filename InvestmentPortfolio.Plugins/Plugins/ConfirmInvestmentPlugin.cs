@@ -25,7 +25,7 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
             tracing.Trace($"Message: {context.MessageName}");
             tracing.Trace($"Depth: {context.Depth}");
 
-            // Validate input
+            // Custom API is bound to Investment, so Target should be an EntityReference.
             if (!context.InputParameters.Contains("Target") ||
                 !(context.InputParameters["Target"] is EntityReference investmentRef))
             {
@@ -34,7 +34,6 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             tracing.Trace($"Target ID: {investmentRef.Id}");
 
-            // Retrieve current DB state
             var investment = service.Retrieve(
                 "mv_investment",
                 investmentRef.Id,
@@ -52,7 +51,7 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             tracing.Trace($"Lifecycle (DB): {lifecycle}");
 
-            // Safe validation (idempotent)
+            // Keep validation idempotent so repeated Confirm calls do not silently change data.
             if (lifecycle == InvestmentStatus.Confirmed)
             {
                 throw new InvalidPluginExecutionException(
@@ -60,10 +59,8 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
                 );
             }
 
-            // Your business validation
             ValidateInvestment(investment);
 
-            // Apply state change
             var update = new Entity("mv_investment")
             {
                 Id = investment.Id
@@ -72,18 +69,14 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
             update["mv_lifecycle"] = new OptionSetValue(InvestmentStatus.Confirmed);
 
             tracing.Trace("Updating lifecycle to Confirmed...");
-
             service.Update(update);
-
             tracing.Trace("Lifecycle updated.");
 
-            // Update related data
+            // Refresh related aggregates after confirmation because Opportunity and Investor totals depend on confirmed investments.
             totalsService.UpdateOpportunityTotalRaised(investment);
-
             tracing.Trace("Opportunity total raised updated.");
 
             totalsService.UpdateInvestorTotalInvested(investment);
-
             tracing.Trace("Investor total invested updated.");
 
             tracing.Trace("=== ConfirmInvestmentPlugin END ===");
@@ -105,7 +98,7 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             if (amount == null || amount.Value < MinimumAmount)
                 throw new InvalidPluginExecutionException(
-                    "Minimum investment amount is 1000."
+                    "Minimum investment amount is 1,000."
                 );
 
             if (!investment.Contains("mv_investor"))

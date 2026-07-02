@@ -19,7 +19,7 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             tracing.Trace("=== ReturnInvestmentToDraftPlugin START ===");
 
-            // Validate input
+            // Custom API is bound to Investment, so Target should be an EntityReference.
             if (!context.InputParameters.Contains("Target") ||
                 !(context.InputParameters["Target"] is EntityReference investmentRef))
             {
@@ -30,7 +30,6 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             tracing.Trace($"Target ID: {investmentRef.Id}");
 
-            // Retrieve current DB state
             var investment = service.Retrieve(
                 "mv_investment",
                 investmentRef.Id,
@@ -49,7 +48,7 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
 
             tracing.Trace($"Lifecycle (DB): {lifecycle}");
 
-            // Validate lifecycle
+            // Only confirmed investments can be returned to Draft.
             if (lifecycle != InvestmentStatus.Confirmed)
             {
                 throw new InvalidPluginExecutionException(
@@ -57,7 +56,6 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
                 );
             }
 
-            // Apply lifecycle change
             var update = new Entity("mv_investment")
             {
                 Id = investment.Id
@@ -67,18 +65,15 @@ namespace InvestmentPortfolio.Plugins.Plugins.Investment
                 new OptionSetValue(InvestmentStatus.Draft);
 
             tracing.Trace("Updating lifecycle to Draft...");
-
             service.Update(update);
-
             tracing.Trace("Lifecycle updated.");
 
-            // Recalculate related totals
+            // Refresh related aggregates after returning to Draft because
+            // only confirmed investments contribute to Opportunity and Investor totals.
             totalsService.UpdateOpportunityTotalRaised(investment);
-
             tracing.Trace("Opportunity total raised updated.");
 
             totalsService.UpdateInvestorTotalInvested(investment);
-
             tracing.Trace("Investor total invested updated.");
 
             tracing.Trace("=== ReturnInvestmentToDraftPlugin END ===");
